@@ -1,17 +1,16 @@
 @echo off
-chcp 65001 >nul
-rem ============================================================
-rem  åŒå‡»æœ¬æ–‡ä»¶ï¼ŒæŠŠä»£ç æ¨é€åˆ° GitHub ä»“åº“ SHAP_grade
-rem  ç¬¬ä¸€æ¬¡æ¨é€æ—¶ä¼šè‡ªåŠ¨å¼¹å‡ºæµè§ˆå™¨è®©ä½ ç™»å½• GitHubï¼Œç™»å½•å®Œå³å®Œæˆã€‚
-rem ============================================================
+rem ==========================================================
+rem  Ë«»÷±¾ÎÄ¼ş£º°Ñ±¾ÏîÄ¿ÍÆËÍµ½ GitHub ²Ö¿â SHAP_grade
+rem  µÚÒ»´ÎÔËĞĞ»áµ¯³öä¯ÀÀÆ÷ÈÃÄãµÇÂ¼ GitHub£¬µÇÂ¼ºó×Ô¶¯Íê³É¡£
+rem ==========================================================
 cd /d "%~dp0"
 
-rem æ‰¾åˆ° git.exeï¼šä¼˜å…ˆç”¨ WorkBuddy è‡ªå¸¦çš„ï¼Œæ‰¾ä¸åˆ°å°±ç”¨ç³»ç»Ÿé‡Œè£…çš„
+rem ÕÒµ½ git.exe£ºÓÅÏÈÓÃ WorkBuddy ×Ô´øµÄ£¬ÕÒ²»µ½¾ÍÓÃÏµÍ³Àï×°µÄ
 set "GITEXE=D:\Programs\WorkBuddy\resources\vendor\PortableGit\mingw64\bin\git.exe"
 if not exist "%GITEXE%" (
   where git >nul 2>&1
   if errorlevel 1 (
-    echo æ²¡æ‰¾åˆ° gitï¼Œè¯·å…ˆå®‰è£… Gitï¼šhttps://git-scm.com/
+    echo Ã»ÓĞÕÒµ½ git£¬ÇëÏÈ°²×° Git: https://git-scm.com/
     pause
     exit /b 1
   )
@@ -20,22 +19,28 @@ if not exist "%GITEXE%" (
 for %%i in ("%GITEXE%") do set "GITDIR=%%~dpi"
 set "PATH=%GITDIR%;%PATH%"
 
-echo æ­£åœ¨æ¨é€åˆ° https://github.com/kkk0-inTheProgramArea/SHAP_grade ...
-echo ï¼ˆè‹¥å¼¹å‡ºæµè§ˆå™¨ï¼Œè¯·ç™»å½•å¹¶æˆæƒ GitHubï¼‰
+echo ÕıÔÚÍÆËÍµ½ https://github.com/kkk0-inTheProgramArea/SHAP_grade
+echo Èôµ¯³öä¯ÀÀÆ÷£¬ÇëµÇÂ¼ GitHub ²¢µã»÷ÊÚÈ¨¡£
 echo.
 
 "%GITEXE%" push -u origin main
+if not errorlevel 1 goto ok
 
-if errorlevel 1 (
-  echo.
-  echo [!] æ¨é€æœªæˆåŠŸï¼Œè¯·çœ‹ä¸€ä¸‹ä¸Šé¢çš„æç¤ºï¼š
-  echo     1. æç¤ºè¦ç™»å½• â€”â€” åœ¨å¼¹å‡ºæµè§ˆå™¨é‡Œç™»å½• GitHub åï¼Œé‡æ–°åŒå‡»æœ¬æ–‡ä»¶
-  echo     2. æç¤ºä»“åº“ä¸å­˜åœ¨ â€”â€” ç¡®è®¤ https://github.com/kkk0-inTheProgramArea/SHAP_grade å·²å»ºå¥½
-  echo     3. æç¤ºç½‘ç»œé”™è¯¯ â€”â€” æ¢ä¸ªç½‘ç»œç¯å¢ƒå†è¯•
-) else (
-  echo.
-  echo [OK] æ¨é€æˆåŠŸï¼æ‰“å¼€ä¸‹é¢åœ°å€å°±èƒ½çœ‹åˆ°ä»£ç ï¼š
-  echo      https://github.com/kkk0-inTheProgramArea/SHAP_grade
-)
 echo.
+echo ÆÕÍ¨ÍÆËÍ±»¾Ü¾ø£¬¸ÄÓÃ¸²¸Ç·½Ê½ÍÆËÍÒ»´Î
+echo £¨»á¸²¸Ç GitHub ÉÏ×Ô¶¯Éú³ÉµÄ README£¬±¾ÏîÄ¿×Ô¼ºµÄ README »á±£Áô£©
+"%GITEXE%" push -u origin main --force
+if not errorlevel 1 goto ok
+
+echo.
+echo [Ê§°Ü] Çë°ÑÉÏÃæµÄÌáÊ¾½ØÍ¼·¢¸øÎÒ¡£
+echo   1. ÌáÊ¾ÒªµÇÂ¼£ºÔÚµ¯³öä¯ÀÀÆ÷µÇÂ¼ GitHub ºó£¬ÖØĞÂË«»÷±¾ÎÄ¼ş
+echo   2. ÌáÊ¾ÍøÂç´íÎó£º»»¸öÍøÂç»·¾³ÔÙÊÔ
+pause
+exit /b 1
+
+:ok
+echo.
+echo [³É¹¦] ´ò¿ªÏÂÃæµØÖ·¾ÍÄÜ¿´µ½´úÂë£º
+echo   https://github.com/kkk0-inTheProgramArea/SHAP_grade
 pause
