@@ -1,0 +1,8 @@
+pandas
+numpy
+flask
+lightgbm
+shap
+matplotlib
+openpyxl
+scikit-learn

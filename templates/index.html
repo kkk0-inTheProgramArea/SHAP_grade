@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>成绩数据清洗 &amp; SHAP 分析小程序</title>
+<style>
+  :root{
+    --blue:#2563eb; --blue-d:#1d4ed8; --bg:#f5f7fb; --card:#fff;
+    --line:#e5e7eb; --text:#1f2937; --muted:#6b7280; --green:#16a34a; --red:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Microsoft YaHei","Segoe UI",sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.6}
+  header{background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;padding:28px 20px}
+  header h1{margin:0 0 6px;font-size:22px}
+  header p{margin:0;opacity:.9;font-size:14px}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:20px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card h2{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .step{background:var(--blue);color:#fff;width:24px;height:24px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+  .drop{border:2px dashed #cbd5e1;border-radius:10px;padding:34px;text-align:center;
+    cursor:pointer;transition:.2s;background:#fafbff}
+  .drop:hover,.drop.over{border-color:var(--blue);background:#eff4ff}
+  .drop small{color:var(--muted)}
+  input[type=file]{display:none}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:10px 18px;
+    font-size:14px;cursor:pointer;transition:.15s}
+  .btn:hover{background:var(--blue-d)}
+  .btn:disabled{background:#9ca3af;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left}
+  th{background:#f3f4f6;font-weight:600}
+  td.sample{color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  select{width:100%;padding:5px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+  .opt-row{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin-top:6px}
+  label.inline{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
+  input[type=text]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .stat{flex:1;min-width:140px;background:#f8faff;border:1px solid #dbeafe;border-radius:10px;padding:14px}
+  .stat .n{font-size:24px;font-weight:700}
+  .stat .l{color:var(--muted);font-size:13px}
+  .stat.red .n{color:var(--red)} .stat.green .n{color:var(--green)}
+  .preview{max-height:360px;overflow:auto}
+  .preview table{font-size:12px}
+  .imp th,.imp td{padding:5px 8px}
+  .err{color:var(--red);background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;font-size:14px;margin-top:8px}
+  .err .btn{margin-left:10px;padding:4px 12px;font-size:13px}
+  .svc{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex:none}
+  .dot.ok{background:#16a34a} .dot.bad{background:#dc2626} .dot.wait{background:#f59e0b}
+  header .svc{color:#e5edff}
+  .ok{color:var(--green)}
+  .hidden{display:none}
+  img.shap{max-width:100%;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+  a.dl{color:var(--blue);text-decoration:none;font-weight:600}
+  a.dl:hover{text-decoration:underline}
+  .spin{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;
+    border-radius:50%;animation:r 1s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes r{to{transform:rotate(360deg)}}
+  /* 页脚：反馈方式 + 使用次数 */
+  .foot{max-width:1080px;margin:0 auto;padding:2px 20px 30px;color:var(--muted);font-size:13px;
+    display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;justify-content:center;text-align:center}
+  .foot a{color:var(--blue);text-decoration:none}
+  .foot a:hover{text-decoration:underline}
+  .foot b{color:var(--text)}
+  .foot .sep{color:#cbd5e1}
+  .foot .chip{display:inline-block;margin:2px 6px 2px 0;padding:2px 10px;border:1px solid #dbeafe;
+    background:#f8faff;border-radius:999px;font-size:12.5px;white-space:nowrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>成绩数据清洗 &amp; SHAP 分析小程序</h1>
+  <p>上传 Excel / CSV → 网页内做列映射 → 自动剔除缺扫/缺考/0分 → 输出标准成绩宽表，可选 LightGBM 成绩预测与特征重要性分析</p>
+  <div class="svc" style="margin-top:8px"><span class="dot" id="svcDot"></span><span id="svcText">正在检测服务…</span></div>
+</header>
+
+<div class="wrap">
+
+  <!-- 步骤1 上传 -->
+  <div class="card">
+    <h2><span class="step">1</span> 上传成绩文件</h2>
+    <div class="drop" id="drop">
+      <div>📄 点击或拖拽文件到此处</div>
+      <small>支持 .xlsx / .xls / .csv（自动识别 GBK / UTF-8 编码）</small>
+    </div>
+    <div class="hint" style="margin-top:8px">
+      第一次使用？可先 <a class="dl" href="/api/template" download>⬇ 下载示例模板</a> 了解应填写的表格格式。
+      表头即使不同也没关系，下一步可手动指定每一列的角色。
+    </div>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv" />
+    <div id="upInfo" class="hint hidden"></div>
+    <div id="upErr" class="err hidden"></div>
+  </div>
+
+  <!-- 步骤2 列映射 -->
+  <div class="card hidden" id="mapCard">
+    <h2><span class="step">2</span> 列角色映射（系统已自动识别，可手动调整）</h2>
+    <p class="hint">为每个列选择角色：<b>目标成绩列</b>（要清洗/预测的成绩）、<b>得分列</b>（各题/各科目分数）、
+      <b>选项列</b>（选择题 A/B/C/D）、<b>标识列</b>（学号/姓名，保留在结果中）、<b>忽略</b>。</p>
+    <div class="preview"><table id="mapTable">
+      <thead><tr><th>列名</th><th>类型</th><th>样例</th><th>角色</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+
+  <!-- 步骤3 清洗与预测配置 -->
+  <div class="card hidden" id="cfgCard">
+    <h2><span class="step">3</span> 清洗与预测设置</h2>
+    <div class="opt-row">
+      <label class="inline">剔除文本标记（逗号分隔）：
+        <input type="text" id="invalidText" value="缺扫,缺考" style="width:160px" />
+      </label>
+      <label class="inline"><input type="checkbox" id="dropZero" checked /> 剔除 0 分</label>
+      <label class="inline"><input type="checkbox" id="dropBlank" checked /> 剔除空值</label>
+    </div>
+    <div class="opt-row">
+      <label class="inline"><input type="checkbox" id="doPredict" /> 同时做成绩预测 + SHAP 特征重要性分析</label>
+      <label class="inline">稳定性（多跑几遍取平均）：
+        <input type="number" id="shapRuns" value="10" min="1" max="50" style="width:64px" /> 遍
+      </label>
+    </div>
+    <div class="hint">提示：SHAP 分析会用「得分列 + 选项列」作为特征，预测「目标成绩列」。</div>
+    <div style="margin-top:14px">
+      <button class="btn" id="runBtn">开始处理</button>
+      <span id="runMsg" class="hint"></span>
+    </div>
+    <div id="procErr" class="err hidden"></div>
+  </div>
+
+  <!-- 结果 -->
+  <div class="card hidden" id="resCard">
+    <h2><span class="step">4</span> 处理结果</h2>
+    <div class="stats" id="stats"></div>
+    <div style="margin-bottom:10px">
+      <a class="dl" id="dlLink" href="#">⬇ 下载清洗后成绩（CSV）</a>
+    </div>
+    <h3 style="font-size:14px;margin:6px 0">数据预览（前 50 行）</h3>
+    <div class="preview"><table id="prevTable"></table></div>
+    <div id="shapBox" class="hidden">
+      <div id="shapScoreBox" class="hidden">
+        <h3 style="font-size:14px;margin:18px 0 4px">图1 · 各题 / 各科「得分」的 SHAP 特征重要性</h3>
+        <div class="hint">说明：每根柱子是该题得分的平均|SHAP|值（对预测成绩的影响大小）；散点是每位学生的 SHAP 值，颜色越红代表该题得分越高。</div>
+        <a class="dl" id="dlScoreImg" download="图1_得分_SHAP特征重要性.png" href="#">⬇ 下载图1（PNG）</a>
+        <img class="shap" id="shapScoreImg" alt="得分特征SHAP图" />
+        <table class="imp" id="impScoreTable">
+          <thead><tr><th>排名</th><th>得分特征</th><th>平均|SHAP|值</th></tr></thead><tbody></tbody>
+        </table>
+      </div>
+
+      <div id="shapOptionBox" class="hidden">
+        <h3 style="font-size:14px;margin:22px 0 4px">图2 · 各题「选项」的 SHAP 特征重要性</h3>
+        <div class="hint">说明：这里把每道题的选择项（如 <b>12_选项_C</b>）单独当特征分析，看「某题选了某个选项」对成绩的影响有多大。</div>
+        <a class="dl" id="dlOptionImg" download="图2_选项_SHAP特征重要性.png" href="#">⬇ 下载图2（PNG）</a>
+        <img class="shap" id="shapOptionImg" alt="选项特征SHAP图" />
+        <table class="imp" id="impOptionTable">
+          <thead><tr><th>排名</th><th>选项特征</th><th>平均|SHAP|值</th></tr></thead><tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 页脚：反馈方式 + 访问/使用次数（内容由 /api/stats 决定，见 loadStats） -->
+<footer class="foot">
+  <div>
+    <span id="fbTip">使用中遇到问题或有建议？欢迎反馈：</span>
+    <span id="fbLinks">—</span>
+  </div>
+  <div class="sep">|</div>
+  <div>访问次数：<b id="visitN">—</b>　使用次数：<b id="runN">—</b></div>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+let SID = null;
+let COLUMNS = [];
+
+// 上传
+const drop = $('#drop'), fileInput = $('#file');
+drop.onclick = () => fileInput.click();
+fileInput.onchange = e => { if (e.target.files[0]) uploadFile(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) uploadFile(f); });
+
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+// ---- 页面打开时先自检服务是否就绪 ----
+async function checkHealth(){
+  const dot = $('#svcDot'), txt = $('#svcText');
+  dot.className = 'dot wait'; txt.textContent = '正在检测服务…';
+  try{
+    const r = await fetch('/api/health', { cache:'no-store' });
+    if(r.ok){ dot.className = 'dot ok'; txt.textContent = '服务正常，可以开始使用'; return true; }
+    dot.className = 'dot bad';
+    txt.textContent = '服务暂时不可用（HTTP ' + r.status + '），请稍后刷新页面';
+    return false;
+  }catch(e){
+    dot.className = 'dot bad';
+    txt.textContent = '服务暂时不可用（网络中断），请稍后刷新页面';
+    return false;
+  }
+}
+checkHealth();
+
+// ---- 页脚：反馈方式 + 访问/使用次数（打开网页时取一次）----
+// 反馈方式由后端 app.py 顶部「页脚反馈方式」那段决定，填了哪个显示哪个。
+function fbChip(text, href, copyText){
+  const a = document.createElement('a');
+  a.className = 'chip';
+  a.textContent = text;
+  if(copyText){                      // QQ / 微信：点击复制号码（手机上不好点开邮件）
+    a.href = 'javascript:void(0)';
+    a.title = '点击复制';
+    a.onclick = () => copyTextToClipboard(copyText, a);
+  }else if(href){
+    a.href = href;
+  }
+  return a;
+}
+
+function copyTextToClipboard(str, el){
+  const done = () => { const o = el.textContent; el.textContent = '✅ 已复制';
+                       setTimeout(() => el.textContent = o, 1500); };
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = str; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }
+    catch(e){ alert('请手动复制：' + str); }
+    document.body.removeChild(ta);
+  };
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(str).then(done).catch(fallback);
+  }else fallback();
+}
+
+async function loadStats(){
+  try{
+    const r = await fetch('/api/stats', { cache:'no-store' });
+    const j = await r.json();
+    $('#visitN').textContent = j.visits;
+    $('#runN').textContent = j.runs;
+    if(j.feedback_tip) $('#fbTip').textContent = j.feedback_tip;
+
+    const box = $('#fbLinks'); box.innerHTML = '';
+    const subj = encodeURIComponent('成绩清洗小程序 使用反馈');
+    const body = encodeURIComponent('我遇到的情况 / 我的建议：\n\n');
+    if(j.feedback_email){                    // 邮箱：点一下直接写信
+      box.appendChild(fbChip('✉ ' + j.feedback_email,
+        'mailto:' + j.feedback_email + '?subject=' + subj + '&body=' + body));
+    }
+    if(j.feedback_qq)     box.appendChild(fbChip('QQ：' + j.feedback_qq, null, j.feedback_qq));
+    if(j.feedback_wechat) box.appendChild(fbChip('微信：' + j.feedback_wechat, null, j.feedback_wechat));
+    if(j.feedback_url)    box.appendChild(fbChip(j.feedback_url_text || '📝 在线反馈表', j.feedback_url));
+    if(!box.children.length) box.textContent = '（未设置反馈方式）';
+  }catch(e){
+    $('#visitN').textContent = '—'; $('#runN').textContent = '—';
+  }
+}
+loadStats();
+
+// 带自动重试的请求封装：
+// 云端服务空闲后会被回收，再次访问时容器正在唤醒，期间可能返回空响应 / 502 / 404。
+// 这里统一自动重试几次，并对非 JSON、空响应给出可读提示（避免 "Unexpected end of JSON input"）。
+async function request(url, makeOpts, tries = 4){
+  let lastMsg = '服务器暂时无响应';
+  for(let i = 0; i < tries; i++){
+    try{
+      const r = await fetch(url, makeOpts());
+      const txt = await r.text();
+      let j = null;
+      try{ j = txt ? JSON.parse(txt) : null; }catch(e){ j = null; }
+      if(j) return { ok: r.ok, j };
+      lastMsg = (r.status === 404)
+        ? '服务地址暂不可用（HTTP 404）'
+        : '服务器繁忙（HTTP ' + r.status + '）';
+    }catch(e){
+      lastMsg = '网络连接中断';
+    }
+    if(i < tries - 1) await sleep(1000 * (i + 1));
+  }
+  throw new Error(lastMsg + '：服务可能正在唤醒（刚重新发布后的十几秒内比较常见）。'
+    + '请稍等片刻后点「🔄 重试」，或直接刷新本页面。');
+}
+
+// 统一的错误提示：带「🔄 重试」按钮，省得老师重新选文件
+function showErr(el, msg, retryFn){
+  el.innerHTML = '';
+  el.appendChild(document.createTextNode(msg));
+  if(typeof retryFn === 'function'){
+    const b = document.createElement('button');
+    b.className = 'btn ghost'; b.textContent = '🔄 重试';
+    b.onclick = () => { el.classList.add('hidden'); retryFn(); };
+    el.appendChild(b);
+  }
+  el.classList.remove('hidden');
+}
+
+async function uploadFile(file){
+  $('#upErr').classList.add('hidden');
+  $('#upInfo').textContent = '上传中…'; $('#upInfo').classList.remove('hidden');
+  try{
+    const { ok, j } = await request('/api/upload', () => {
+      const fd = new FormData(); fd.append('file', file);
+      return { method: 'POST', body: fd };
+    }, 5);
+    if(!ok) throw new Error(j.error || '上传失败');
+    SID = j.session_id; COLUMNS = j.columns;
+    let info = `✅ 已解析：${j.row_count} 行，${j.columns.length} 列`;
+    if(j.dropped_empty) info += `（已自动忽略 ${j.dropped_empty} 个空白列）`;
+    $('#upInfo').textContent = info;
+    buildMap(j.suggestions);
+    $('#mapCard').classList.remove('hidden');
+    $('#cfgCard').classList.remove('hidden');
+    checkHealth();
+  }catch(err){
+    $('#upInfo').classList.add('hidden');
+    // 保留文件，点「重试」即重新上传，不用再选一次
+    showErr($('#upErr'), err.message, () => uploadFile(file));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  「列角色映射」表格就是这么生成的（第 2 步那张表）
+//  数据来源：第 1 步上传后，后端 /api/upload 返回两样东西：
+//    COLUMNS           每列的 {name 列名, dtype 类型, sample 前3个样例值}
+//    j.suggestions     后端猜的角色 {target, score_cols, option_cols, id_cols, empty_cols}
+//  做法：一个列 = 表格里一行 <tr>，每行 4 个格子 <td>：
+//    第1格 列名 / 第2格 类型 / 第3格 样例 / 第4格 一个 <select> 下拉框（选项=5种角色）
+//  下拉框里哪个 <option> 带 selected，取决于后端猜的角色 → 老师看到的默认值。
+//  老师手动改过之后，点「开始处理」时会用 runProcess() 从上往下读一遍所有
+//  <select> 的当前值，收集成 score_cols / option_cols / ... 再发给后端。
+// ══════════════════════════════════════════════════════════════════
+function buildMap(sug){
+  const tb = $('#mapTable tbody');
+  tb.innerHTML = '';                       // 先清空，重新上传时不会叠加旧行
+  COLUMNS.forEach(c => {                   // 遍历每一列
+    const tr = document.createElement('tr');
+
+    // 这一步：决定这一列在下拉框里默认选中哪一项
+    // 判断顺序不能乱：先看是不是目标列，再看得分/选项/标识，都不像就"忽略"
+    const role = c.name === sug.target        ? 'target'
+      : sug.score_cols.includes(c.name)       ? 'score'
+      : sug.option_cols.includes(c.name)      ? 'option'
+      : sug.id_cols.includes(c.name)          ? 'id'
+      : 'ignore';
+
+    tr.innerHTML = `<td>${c.name}</td><td>${c.dtype}</td>
+      <td class="sample" title="${c.sample.join(', ')}">${c.sample.join(', ')}</td>
+      <td><select data-col="${c.name}">
+        <option value="ignore" ${role==='ignore'?'selected':''}>忽略</option>
+        <option value="target" ${role==='target'?'selected':''}>目标成绩列</option>
+        <option value="score"  ${role==='score'?'selected':''}>得分列</option>
+        <option value="option" ${role==='option'?'selected':''}>选项列</option>
+        <option value="id"     ${role==='id'?'selected':''}>标识列</option>
+      </select></td>`;
+    tb.appendChild(tr);                    // 把这一行塞进表格
+  });
+}
+
+$('#runBtn').onclick = () => runProcess();
+
+async function runProcess(){
+  $('#procErr').classList.add('hidden');
+  const roles = {target:[],score:[],option:[],id:[]};
+  document.querySelectorAll('#mapTable select').forEach(s=>{
+    const r=s.value; if(r!=='ignore') roles[r].push(s.dataset.col);
+  });
+  if(roles.target.length!==1){ alert('请恰好指定 1 个「目标成绩列」'); return; }
+  if(roles.score.length===0 && roles.option.length===0){ alert('请至少指定一个「得分列」或「选项列」'); return; }
+
+  const payload = {
+    session_id: SID,
+    target: roles.target[0],
+    score_cols: roles.score,
+    option_cols: roles.option,
+    id_cols: roles.id,
+    invalid_text: $('#invalidText').value,
+    drop_zero: $('#dropZero').checked,
+    drop_blank: $('#dropBlank').checked,
+    do_predict: $('#doPredict').checked,
+    n_runs: parseInt($('#shapRuns').value, 10) || 10,
+  };
+  $('#runBtn').disabled = true;
+  const nr = parseInt($('#shapRuns').value, 10) || 10;
+  $('#runMsg').innerHTML = '<span class="spin"></span>处理中（SHAP 分析需多跑 ' + nr + ' 遍取平均，可能需要几十秒）…';
+  try{
+    const { ok, j } = await request('/api/process', () => ({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }), 3);
+    if(!ok) throw new Error(j.error || '处理失败');
+    showResult(j);
+  }catch(err){
+    // 会话失效时重试也没用，提示重新上传；其余情况给「重试」按钮
+    const expired = /会话|重新上传/.test(err.message);
+    showErr($('#procErr'), err.message, expired ? null : runProcess);
+  }finally{
+    $('#runBtn').disabled = false; $('#runMsg').textContent = '';
+  }
+}
+
+function showResult(j){
+  if(j.runs) $('#runN').textContent = j.runs;   // 页脚「使用次数」同步 +1
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="n">${j.original_count}</div><div class="l">原始总行数</div></div>
+    <div class="stat green"><div class="n">${j.cleaned_count}</div><div class="l">清洗后有效行</div></div>
+    <div class="stat red"><div class="n">${j.deleted_count}</div><div class="l">已剔除无效行</div></div>`;
+  // 预览
+  const pt = $('#prevTable');
+  const cols = j.preview.columns;
+  pt.innerHTML = '<thead><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr></thead><tbody>'+
+    j.preview.rows.map(r=>'<tr>'+r.map(v=>`<td>${v===null?'':v}</td>`).join('')+'</tr>').join('')+'</tbody>';
+  // 下载
+  $('#dlLink').href = '/api/download/'+j.token;
+  // ---- SHAP：两张图分开渲染（图1 得分 / 图2 选项）----
+  const sh = j.shap || {};
+  renderShapGroup('score', sh.score);
+  renderShapGroup('option', sh.option);
+  const anyShap = !!(sh.score && sh.score.image) || !!(sh.option && sh.option.image);
+  $('#shapBox').classList.toggle('hidden', !anyShap);
+
+  $('#resCard').classList.remove('hidden');
+  $('#resCard').scrollIntoView({behavior:'smooth'});
+}
+
+// 渲染一组 SHAP 结果（score / option 共用）
+function renderShapGroup(kind, data){
+  const box = kind === 'score' ? $('#shapScoreBox') : $('#shapOptionBox');
+  if(!data || !data.image){ box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const src = 'data:image/png;base64,' + data.image;
+  const img = kind === 'score' ? $('#shapScoreImg') : $('#shapOptionImg');
+  img.src = src;
+  (kind === 'score' ? $('#dlScoreImg') : $('#dlOptionImg')).href = src;
+  const tb = (kind === 'score' ? $('#impScoreTable') : $('#impOptionTable')).querySelector('tbody');
+  tb.innerHTML = '';
+  (data.importance || []).forEach((r, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${r.feature}</td><td>${r.shap.toFixed(4)}</td>`;
+    tb.appendChild(tr);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# WorkBuddy 平台的项目数据与已发布应用标记（不必上传）
+.workbuddy/
+*.genie
+
+# 本地计数文件（线上会自己重新生成）
+usage_stats.json
+
+# 临时目录
+_tmp/
